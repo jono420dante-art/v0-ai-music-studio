@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -16,21 +16,23 @@ import {
   VolumeX,
   Pause,
 } from "lucide-react"
+import { useMixerEngine, useSpectrum } from "@/hooks/use-tone-engine"
+import { SpectrumVisualizer } from "@/components/audio-visualizer"
 
-const channels = [
-  { id: "vocals", label: "Lead Vocals", volume: 85, muted: false, solo: false },
-  { id: "kick", label: "Kick", volume: 90, muted: false, solo: false },
-  { id: "snare", label: "Snare", volume: 78, muted: false, solo: false },
-  { id: "hihat", label: "Hi-Hats", volume: 65, muted: false, solo: false },
-  { id: "bass", label: "Bass", volume: 88, muted: false, solo: false },
-  { id: "synth", label: "Synth Lead", volume: 72, muted: false, solo: false },
-  { id: "pad", label: "Pad", volume: 55, muted: false, solo: false },
-  { id: "master", label: "Master", volume: 95, muted: false, solo: false },
+/* ─── Channel definitions with note sequences ─── */
+const channelDefs = [
+  { id: "vocals", label: "Lead Vocals", volume: 85, muted: false, solo: false, notes: ["C5", "E5", "G5", "A5", "G5", "E5", "C5", "D5"], sub: "4n", type: "lead" as const },
+  { id: "kick", label: "Kick", volume: 90, muted: false, solo: false, notes: ["C2", "C2", "C2", "C2"], sub: "4n", type: "bass" as const },
+  { id: "snare", label: "Snare", volume: 78, muted: false, solo: false, notes: ["E3", "E3", "E3", "E3"], sub: "8n", type: "lead" as const },
+  { id: "hihat", label: "Hi-Hats", volume: 65, muted: false, solo: false, notes: ["F#5", "F#5", "F#5", "F#5", "F#5", "F#5", "F#5", "F#5"], sub: "16n", type: "lead" as const },
+  { id: "bass", label: "Bass", volume: 88, muted: false, solo: false, notes: ["C2", "G2", "Eb2", "Bb2"], sub: "4n", type: "bass" as const },
+  { id: "synth", label: "Synth Lead", volume: 72, muted: false, solo: false, notes: ["C4", "E4", "G4", "B4", "A4", "F4", "D4", "G4"], sub: "8n", type: "lead" as const },
+  { id: "pad", label: "Pad", volume: 55, muted: false, solo: false, notes: ["C3", "E3", "G3", "B3"], sub: "2n", type: "pad" as const },
+  { id: "master", label: "Master", volume: 95, muted: false, solo: false, notes: [], sub: "4n", type: "lead" as const },
 ]
 
 export default function MixerPage() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [channelState, setChannelState] = useState(channels)
+  const [channelState, setChannelState] = useState(channelDefs)
   const [selectedChannel, setSelectedChannel] = useState("vocals")
   const [eqLow, setEqLow] = useState([2])
   const [eqMid, setEqMid] = useState([-1])
@@ -39,10 +41,69 @@ export default function MixerPage() {
   const [reverb, setReverb] = useState([25])
   const [delay, setDelay] = useState([10])
   const [compression, setCompression] = useState([60])
+  const [transportTime, setTransportTime] = useState("00:00:00.000")
 
-  const updateChannel = (id: string, updates: Partial<(typeof channels)[0]>) => {
+  const mixer = useMixerEngine()
+  const spectrum = useSpectrum(32)
+
+  // Initialize mixer channels on mount
+  useEffect(() => {
+    channelDefs.forEach((ch) => {
+      if (ch.id !== "master" && ch.notes.length > 0) {
+        mixer.setupChannel(ch.id, ch.notes, ch.sub, ch.type)
+        mixer.setChannelVolume(ch.id, ch.volume)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Transport time ticker
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    if (mixer.isPlaying) {
+      let seconds = 0
+      interval = setInterval(() => {
+        seconds += 0.1
+        const mins = Math.floor(seconds / 60)
+        const secs = Math.floor(seconds % 60)
+        const ms = Math.floor((seconds % 1) * 1000)
+        setTransportTime(
+          `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}:${String(ms).padStart(3, "0")}`
+        )
+      }, 100)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [mixer.isPlaying])
+
+  const handlePlay = useCallback(async () => {
+    if (mixer.isPlaying) {
+      mixer.stopAll()
+      spectrum.stop()
+    } else {
+      await mixer.startAll()
+      spectrum.start()
+    }
+  }, [mixer, spectrum])
+
+  const handleStop = useCallback(() => {
+    mixer.stopAll()
+    spectrum.stop()
+    setTransportTime("00:00:00.000")
+  }, [mixer, spectrum])
+
+  const updateChannel = (id: string, updates: Partial<(typeof channelDefs)[0]>) => {
     setChannelState((prev) =>
-      prev.map((ch) => (ch.id === id ? { ...ch, ...updates } : ch))
+      prev.map((ch) => {
+        if (ch.id !== id) return ch
+        const updated = { ...ch, ...updates }
+        // Sync with Tone.js
+        if (updates.volume !== undefined) mixer.setChannelVolume(id, updates.volume)
+        if (updates.muted !== undefined) mixer.setChannelMute(id, updates.muted)
+        if (updates.solo !== undefined) mixer.setChannelSolo(id, updates.solo)
+        return updated
+      })
     )
   }
 
@@ -59,15 +120,20 @@ export default function MixerPage() {
           <Button variant="ghost" size="sm" className="size-8 p-0 text-muted-foreground hover:text-foreground">
             <Rewind className="size-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="size-8 p-0 text-muted-foreground hover:text-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-8 p-0 text-muted-foreground hover:text-foreground"
+            onClick={handleStop}
+          >
             <Square className="size-3.5" />
           </Button>
           <Button
             size="sm"
             className="size-8 p-0 bg-primary text-primary-foreground hover:bg-primary/90"
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={handlePlay}
           >
-            {isPlaying ? <Pause className="size-4" /> : <Play className="size-4 ml-0.5" />}
+            {mixer.isPlaying ? <Pause className="size-4" /> : <Play className="size-4 ml-0.5" />}
           </Button>
           <Button variant="ghost" size="sm" className="size-8 p-0 text-muted-foreground hover:text-foreground">
             <FastForward className="size-4" />
@@ -79,10 +145,19 @@ export default function MixerPage() {
 
         <div className="flex items-center gap-6">
           <div className="rounded-md bg-secondary px-4 py-1.5 font-mono text-sm text-foreground">
-            00:01:24.000
+            {transportTime}
           </div>
           <div className="rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-foreground">
             120 BPM
+          </div>
+          {/* Live spectrum in transport bar */}
+          <div className="hidden w-24 lg:block">
+            <SpectrumVisualizer
+              data={spectrum.spectrumData}
+              isPlaying={mixer.isPlaying}
+              barCount={16}
+              height={24}
+            />
           </div>
         </div>
 
@@ -114,10 +189,18 @@ export default function MixerPage() {
                 <div className="relative mb-3 h-40 w-6">
                   <div className="absolute inset-0 rounded-full bg-secondary" />
                   <div
-                    className="absolute bottom-0 left-0 right-0 rounded-full bg-primary/40"
-                    style={{ height: `${ch.volume}%` }}
+                    className="absolute bottom-0 left-0 right-0 rounded-full transition-all duration-150"
+                    style={{
+                      height: `${ch.volume}%`,
+                      backgroundColor: ch.muted
+                        ? "var(--destructive)"
+                        : mixer.isPlaying
+                          ? "var(--primary)"
+                          : "var(--primary)",
+                      opacity: ch.muted ? 0.3 : mixer.isPlaying ? 0.7 : 0.4,
+                    }}
                   />
-                  {/* Level meter */}
+                  {/* Level meter ticks */}
                   <div className="absolute -left-2 bottom-0 top-0 flex flex-col justify-between py-1">
                     {[100, 75, 50, 25, 0].map((tick) => (
                       <div key={tick} className="h-px w-1.5 bg-muted-foreground/30" />
@@ -192,7 +275,20 @@ export default function MixerPage() {
                   {currentChannel?.label}
                 </p>
               </div>
-              <p className="mb-6 text-xs text-muted-foreground">Channel Inspector</p>
+              <p className="mb-4 text-xs text-muted-foreground">Channel Inspector</p>
+
+              {/* Live spectrum for selected channel */}
+              <div className="mb-6 rounded-lg border border-border bg-secondary/30 p-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Output Spectrum
+                </p>
+                <SpectrumVisualizer
+                  data={spectrum.spectrumData}
+                  isPlaying={mixer.isPlaying}
+                  barCount={24}
+                  height={40}
+                />
+              </div>
 
               {/* EQ */}
               <div className="mb-6">
@@ -213,7 +309,16 @@ export default function MixerPage() {
                 </p>
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] text-muted-foreground">L</span>
-                  <Slider value={pan} onValueChange={setPan} min={-50} max={50} className="flex-1" />
+                  <Slider
+                    value={pan}
+                    onValueChange={(v) => {
+                      setPan(v)
+                      if (selectedChannel) mixer.setChannelPan(selectedChannel, v[0])
+                    }}
+                    min={-50}
+                    max={50}
+                    className="flex-1"
+                  />
                   <span className="text-[10px] text-muted-foreground">R</span>
                 </div>
                 <p className="mt-1 text-center text-xs text-muted-foreground">

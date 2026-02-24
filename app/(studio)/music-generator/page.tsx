@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
@@ -15,13 +15,17 @@ import {
 import {
   Sparkles,
   Lightbulb,
-  Volume2,
   Gauge,
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
   Zap,
+  Play,
+  Pause,
+  Square,
 } from "lucide-react"
+import { useToneEngine, useSpectrum, useBeatDetector } from "@/hooks/use-tone-engine"
+import { SpectrumVisualizer, BeatPulse, BeatGrid } from "@/components/audio-visualizer"
 
 /* ─── Genre list (16 genres) ─── */
 const genres = [
@@ -64,6 +68,14 @@ const audioQualities = [
   { value: "wav", label: "WAV (Studio)" },
 ]
 
+/* ─── BPM presets per genre ─── */
+const genreBPM: Record<string, number> = {
+  "Afro House": 120, "Cinematic": 80, "Lo-Fi": 85, "EDM": 128,
+  "Hip-Hop": 90, "Jazz": 110, "Ambient": 70, "Pop": 120,
+  "Techno": 130, "Trap": 140, "R&B": 95, "Soul": 100,
+  "Indie": 115, "Metal": 160, "Classical": 100, "Reggae": 80,
+}
+
 export default function MusicGeneratorPage() {
   const [prompt, setPrompt] = useState("")
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
@@ -79,6 +91,11 @@ export default function MusicGeneratorPage() {
   const [bass, setBass] = useState([50])
   const [treble, setTreble] = useState([50])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [hasGenerated, setHasGenerated] = useState(false)
+
+  const tone = useToneEngine()
+  const spectrum = useSpectrum(32)
+  const beatDetector = useBeatDetector()
 
   const toggleMood = (mood: string) => {
     setSelectedMoods((prev) =>
@@ -86,12 +103,44 @@ export default function MusicGeneratorPage() {
     )
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = useCallback(async () => {
     setIsGenerating(true)
-    setTimeout(() => setIsGenerating(false), 3000)
-  }
+    // Simulate generation time then play Tone.js preview
+    setTimeout(async () => {
+      setIsGenerating(false)
+      setHasGenerated(true)
+      const genreKey = selectedGenre?.toLowerCase().replace(/\s+/g, "-") || "default"
+      const bpm = selectedGenre ? genreBPM[selectedGenre] || 120 : 120
+      const synthType = selectedMoods.includes("Dark") || selectedMoods.includes("Aggressive")
+        ? "bass" as const
+        : selectedMoods.includes("Dreamy") || selectedMoods.includes("Ethereal")
+          ? "pad" as const
+          : "lead" as const
+      await tone.playSequence(genreKey, bpm, synthType)
+      spectrum.start()
+      beatDetector.startDetection()
+    }, 2000)
+  }, [selectedGenre, selectedMoods, tone, spectrum, beatDetector])
 
-  /* Find a contextual suggestion based on selections */
+  const handlePreviewToggle = useCallback(async () => {
+    if (tone.isPlaying) {
+      tone.pause()
+      spectrum.stop()
+      beatDetector.stopDetection()
+    } else {
+      await tone.resume()
+      spectrum.start()
+      beatDetector.startDetection()
+    }
+  }, [tone, spectrum, beatDetector])
+
+  const handleStop = useCallback(() => {
+    tone.stop()
+    spectrum.stop()
+    beatDetector.stopDetection()
+  }, [tone, spectrum, beatDetector])
+
+  /* Dynamic suggestion */
   const suggestion = selectedGenre
     ? `Try ${selectedGenre} + ${selectedMoods[0] || "Energetic"} for maximum impact`
     : "Select a genre and mood to get AI suggestions"
@@ -117,26 +166,43 @@ export default function MusicGeneratorPage() {
               <p className="text-xs text-foreground leading-relaxed">{suggestion}</p>
             </div>
 
-            {/* Equipment Card */}
-            <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <SlidersHorizontal className="size-3.5 text-muted-foreground" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Equipment</span>
-              </div>
-              <p className="text-xs text-foreground">
-                {selectedMoods[0] ? `${moodGrid.find((m) => m.mood === selectedMoods[0])?.tag || "Mixer Board"} - Perfect for this mood` : "Select a mood to see equipment"}
-              </p>
-            </div>
-
-            {/* Pro Tip Card */}
+            {/* Beat Detection Card (BeatNet-inspired) */}
             <div className="rounded-lg border border-border bg-secondary/50 p-3">
               <div className="mb-1.5 flex items-center gap-2">
                 <Zap className="size-3.5 text-chart-3" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-chart-3">Pro Tip</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-chart-3">
+                  BeatNet Detector
+                </span>
               </div>
-              <p className="text-xs text-foreground leading-relaxed">
-                Increase compression ({compression[0]}%) for punchier sound
-              </p>
+              {beatDetector.isDetecting ? (
+                <div className="flex flex-col gap-2">
+                  <BeatPulse currentBeat={beatDetector.currentBeat} isActive={true} />
+                  <BeatGrid beats={beatDetector.beats} maxBeats={16} />
+                  <p className="text-[10px] text-muted-foreground">
+                    {beatDetector.beats.length} beats detected
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-foreground leading-relaxed">
+                  Generate a track to detect beats and tempo in real-time
+                </p>
+              )}
+            </div>
+
+            {/* Live Spectrum */}
+            <div className="rounded-lg border border-border bg-secondary/50 p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Output Spectrum
+                </span>
+              </div>
+              <SpectrumVisualizer
+                data={spectrum.spectrumData}
+                isPlaying={tone.isPlaying}
+                barCount={24}
+                height={36}
+              />
             </div>
 
             {/* Quality Card */}
@@ -156,7 +222,6 @@ export default function MusicGeneratorPage() {
                 Quality & Tools
               </p>
 
-              {/* Audio Quality */}
               <div className="mb-4">
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                   Audio Quality
@@ -173,12 +238,10 @@ export default function MusicGeneratorPage() {
                 </Select>
               </div>
 
-              {/* Compression */}
               <LeftSlider label="Compression" value={compression} onChange={setCompression} suffix="%" />
               <LeftSlider label="Reverb" value={reverb} onChange={setReverb} suffix="%" />
               <LeftSlider label="Delay" value={delay} onChange={setDelay} suffix="%" />
 
-              {/* Advanced Toggle */}
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="mt-3 flex w-full items-center justify-between rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -206,11 +269,11 @@ export default function MusicGeneratorPage() {
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-foreground">Music Generation Studio</h2>
             <p className="text-sm text-muted-foreground">
-              Create professional tracks with AI-powered production tools
+              Create professional tracks with AI-powered production tools &middot; Powered by Tone.js
             </p>
           </div>
 
-          {/* ─── Describe Your Music ─── */}
+          {/* Prompt */}
           <div className="mb-6">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Describe Your Music
@@ -224,10 +287,10 @@ export default function MusicGeneratorPage() {
             />
           </div>
 
-          {/* ─── Genre Selector ─── */}
+          {/* Genre Selector */}
           <div className="mb-6">
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Genre
+              Genre {selectedGenre && <span className="text-primary">({genreBPM[selectedGenre]} BPM)</span>}
             </p>
             <div className="flex flex-wrap gap-2">
               {genres.map((genre) => (
@@ -247,7 +310,7 @@ export default function MusicGeneratorPage() {
             </div>
           </div>
 
-          {/* ─── Studio Mood Grid ─── */}
+          {/* Studio Mood Grid */}
           <div className="mb-6">
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Studio Mood Grid
@@ -274,7 +337,7 @@ export default function MusicGeneratorPage() {
             </div>
           </div>
 
-          {/* ─── Duration Slider ─── */}
+          {/* Duration */}
           <div className="mb-6">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -282,38 +345,108 @@ export default function MusicGeneratorPage() {
               </p>
               <span className="text-xs font-semibold text-foreground">{duration[0]}s</span>
             </div>
-            <Slider
-              value={duration}
-              onValueChange={setDuration}
-              min={10}
-              max={120}
-              step={5}
-            />
+            <Slider value={duration} onValueChange={setDuration} min={10} max={120} step={5} />
             <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
               <span>10s</span>
               <span>120s</span>
             </div>
           </div>
 
-          {/* ─── Generate Button ─── */}
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-            size="lg"
-          >
-            {isGenerating ? (
+          {/* Generate / Preview Controls */}
+          <div className="flex gap-3">
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+              size="lg"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" />
+                  Generate Track
+                </>
+              )}
+            </Button>
+
+            {hasGenerated && (
               <>
-                <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-4" />
-                Generate Track
+                <Button
+                  onClick={handlePreviewToggle}
+                  variant="outline"
+                  size="lg"
+                  className="gap-2"
+                >
+                  {tone.isPlaying ? (
+                    <>
+                      <Pause className="size-4" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-4" />
+                      Preview
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleStop}
+                  variant="outline"
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Square className="size-4" />
+                  Stop
+                </Button>
               </>
             )}
-          </Button>
+          </div>
+
+          {/* Preview Waveform when playing */}
+          {hasGenerated && (
+            <div className="mt-6 rounded-xl border border-border bg-card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Generated Preview
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-muted-foreground">
+                    {selectedGenre || "Default"} &middot; {selectedGenre ? genreBPM[selectedGenre] : 120} BPM
+                  </span>
+                  <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">
+                    Tone.js
+                  </Badge>
+                </div>
+              </div>
+              <SpectrumVisualizer
+                data={spectrum.spectrumData}
+                isPlaying={tone.isPlaying}
+                barCount={48}
+                height={56}
+              />
+              {/* Scrubber */}
+              <div className="mt-3 flex items-center gap-3">
+                <span className="w-10 text-right text-[10px] font-mono text-muted-foreground">
+                  {formatTime(tone.progress)}
+                </span>
+                <Slider
+                  value={[tone.progress]}
+                  onValueChange={([v]) => tone.setProgress(v)}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  className="flex-1"
+                />
+                <span className="w-10 text-[10px] font-mono text-muted-foreground">
+                  {duration[0]}s
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </div>
@@ -347,4 +480,12 @@ function LeftSlider({
       <Slider value={value} onValueChange={onChange} min={min} max={max} step={1} />
     </div>
   )
+}
+
+function formatTime(progressPct: number) {
+  const totalSec = 30 // loop duration
+  const currentSec = Math.round((progressPct / 100) * totalSec)
+  const m = Math.floor(currentSec / 60)
+  const s = currentSec % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }

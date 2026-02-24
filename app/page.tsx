@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -36,6 +36,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
+import { useToneEngine, useWaveform, useSpectrum, useBeatDetector } from "@/hooks/use-tone-engine"
+import { SpectrumVisualizer, BeatPulse } from "@/components/audio-visualizer"
 
 /* ─── Navigation Links ─── */
 const navLinks = [
@@ -88,92 +90,74 @@ const frontierModels = [
 
 /* ─── Trending Tracks ─── */
 const trendingTracks = [
-  {
-    id: "1",
-    title: "Cyber Sunset",
-    artist: "NeonWave",
-    genre: "Synthwave",
-    bpm: 112,
-    duration: "03:42",
-    plays: "184K",
-    added: null,
-  },
-  {
-    id: "2",
-    title: "Techno Bloom",
-    artist: "DJ Mira",
-    genre: "Techno",
-    bpm: 128,
-    duration: "04:11",
-    plays: "142K",
-    added: null,
-  },
-  {
-    id: "3",
-    title: "Lo-Fi Rain",
-    artist: "SleepyBeats",
-    genre: "Lo-Fi Hip Hop",
-    bpm: 88,
-    duration: "05:20",
-    plays: "312K",
-    added: null,
-  },
+  { id: "1", title: "Cyber Sunset", artist: "NeonWave", genre: "Synthwave", bpm: 112, duration: "03:42", plays: "184K", added: null, synthType: "lead" as const },
+  { id: "2", title: "Techno Bloom", artist: "DJ Mira", genre: "Techno", bpm: 128, duration: "04:11", plays: "142K", added: null, synthType: "bass" as const },
+  { id: "3", title: "Lo-Fi Rain", artist: "SleepyBeats", genre: "Lo-Fi Hip Hop", bpm: 88, duration: "05:20", plays: "312K", added: null, synthType: "pad" as const },
 ]
 
 const recentlyAdded = [
-  {
-    id: "4",
-    title: "Astral Drift",
-    artist: "CosmicSynth",
-    genre: "Ambient",
-    bpm: 72,
-    duration: "06:15",
-    plays: "23K",
-    added: "2 hours ago",
-  },
-  {
-    id: "5",
-    title: "Pulse Drive",
-    artist: "VoltMachine",
-    genre: "EDM",
-    bpm: 140,
-    duration: "03:55",
-    plays: "8K",
-    added: "5 hours ago",
-  },
-  {
-    id: "6",
-    title: "Velvet Midnight",
-    artist: "SoulCollective",
-    genre: "R&B",
-    bpm: 96,
-    duration: "04:30",
-    plays: "15K",
-    added: "8 hours ago",
-  },
+  { id: "4", title: "Astral Drift", artist: "CosmicSynth", genre: "Ambient", bpm: 72, duration: "06:15", plays: "23K", added: "2 hours ago", synthType: "pad" as const },
+  { id: "5", title: "Pulse Drive", artist: "VoltMachine", genre: "EDM", bpm: 140, duration: "03:55", plays: "8K", added: "5 hours ago", synthType: "lead" as const },
+  { id: "6", title: "Velvet Midnight", artist: "SoulCollective", genre: "R&B", bpm: 96, duration: "04:30", plays: "15K", added: "8 hours ago", synthType: "lead" as const },
 ]
+
+type Track = typeof trendingTracks[number]
 
 /* ─── Component ─── */
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [currentTrack, setCurrentTrack] = useState<typeof trendingTracks[0] | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null)
   const [volume, setVolume] = useState([75])
   const [isMuted, setIsMuted] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const allTracks = [...trendingTracks, ...recentlyAdded]
+  const tone = useToneEngine()
+  const spectrum = useSpectrum(32)
+  const waveform = useWaveform(64)
+  const beatDetector = useBeatDetector()
 
-  const playTrack = useCallback((track: typeof trendingTracks[0]) => {
-    setCurrentTrack(track)
-    setIsPlaying(true)
-    setProgress(0)
-  }, [])
+  const allTracks: Track[] = [...trendingTracks, ...recentlyAdded]
+
+  const playTrack = useCallback(
+    async (track: Track) => {
+      // If same track, toggle play/pause
+      if (currentTrack?.id === track.id && tone.isPlaying) {
+        tone.pause()
+        spectrum.stop()
+        waveform.stop()
+        beatDetector.stopDetection()
+        return
+      }
+      if (currentTrack?.id === track.id && !tone.isPlaying) {
+        tone.resume()
+        spectrum.start()
+        waveform.start()
+        beatDetector.startDetection()
+        return
+      }
+
+      setCurrentTrack(track)
+      const genreKey = track.genre.toLowerCase().split(" ")[0]
+      await tone.playSequence(genreKey, track.bpm, track.synthType)
+      spectrum.start()
+      waveform.start()
+      beatDetector.startDetection()
+    },
+    [currentTrack, tone, spectrum, waveform, beatDetector]
+  )
 
   const togglePlay = useCallback(() => {
-    setIsPlaying((prev) => !prev)
-  }, [])
+    if (tone.isPlaying) {
+      tone.pause()
+      spectrum.stop()
+      waveform.stop()
+      beatDetector.stopDetection()
+    } else {
+      tone.resume()
+      spectrum.start()
+      waveform.start()
+      beatDetector.startDetection()
+    }
+  }, [tone, spectrum, waveform, beatDetector])
 
   const skipNext = useCallback(() => {
     if (!currentTrack) return
@@ -189,24 +173,10 @@ export default function HomePage() {
     playTrack(prev)
   }, [currentTrack, allTracks, playTrack])
 
+  // Sync volume with Tone.js
   useEffect(() => {
-    if (isPlaying) {
-      progressInterval.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            setIsPlaying(false)
-            return 100
-          }
-          return prev + 0.5
-        })
-      }, 150)
-    } else if (progressInterval.current) {
-      clearInterval(progressInterval.current)
-    }
-    return () => {
-      if (progressInterval.current) clearInterval(progressInterval.current)
-    }
-  }, [isPlaying])
+    tone.setVolume(isMuted ? 0 : volume[0])
+  }, [volume, isMuted, tone])
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -256,7 +226,6 @@ export default function HomePage() {
       <main className="flex-1">
         {/* ─── Hero Section ─── */}
         <section className="relative overflow-hidden border-b border-border/50">
-          {/* Subtle grid background */}
           <div className="absolute inset-0 opacity-[0.03]" style={{
             backgroundImage: "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)",
             backgroundSize: "60px 60px",
@@ -276,6 +245,18 @@ export default function HomePage() {
               Professional AI Music Studio for producers and enthusiasts.
               Generate tracks, videos, art, and more with frontier AI models.
             </p>
+
+            {/* Live Spectrum Preview in Hero */}
+            {tone.isPlaying && (
+              <div className="mx-auto mt-6 max-w-md">
+                <SpectrumVisualizer
+                  data={spectrum.spectrumData}
+                  isPlaying={tone.isPlaying}
+                  barCount={48}
+                  height={32}
+                />
+              </div>
+            )}
 
             {/* Quick Access Buttons */}
             <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-2">
@@ -414,10 +395,31 @@ export default function HomePage() {
                       <span className="text-3xl font-black text-primary/15">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <div className="flex size-9 items-center justify-center rounded-full bg-secondary text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Play className="size-3.5 ml-0.5" />
+                      <div className={`flex size-9 items-center justify-center rounded-full transition-all ${
+                        currentTrack?.id === track.id && tone.isPlaying
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:bg-primary group-hover:text-primary-foreground"
+                      }`}>
+                        {currentTrack?.id === track.id && tone.isPlaying ? (
+                          <Pause className="size-3.5" />
+                        ) : (
+                          <Play className="size-3.5 ml-0.5" />
+                        )}
                       </div>
                     </div>
+
+                    {/* Live spectrum on active track card */}
+                    {currentTrack?.id === track.id && tone.isPlaying && (
+                      <div className="mb-3">
+                        <SpectrumVisualizer
+                          data={spectrum.spectrumData}
+                          isPlaying={tone.isPlaying}
+                          barCount={24}
+                          height={24}
+                        />
+                      </div>
+                    )}
+
                     <p className="text-sm font-semibold text-foreground">{track.title}</p>
                     <p className="text-xs text-muted-foreground">{track.artist}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
@@ -449,7 +451,7 @@ export default function HomePage() {
                     }`}
                   >
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                      {currentTrack?.id === track.id && isPlaying ? (
+                      {currentTrack?.id === track.id && tone.isPlaying ? (
                         <Pause className="size-3.5" />
                       ) : (
                         <Play className="size-3.5 ml-0.5" />
@@ -525,7 +527,7 @@ export default function HomePage() {
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-border bg-card/50">
+      <footer className={`border-t border-border bg-card/50 ${currentTrack ? "pb-20" : ""}`}>
         <div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-4">
           <p className="text-xs text-muted-foreground">
             &copy; 2026 DIETER PRO. All rights reserved &ndash; ED GEERDES
@@ -537,22 +539,29 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* ─── Audio Player (sticky bottom) ─── */}
+      {/* ─── Tone.js Audio Player (sticky bottom) ─── */}
       {currentTrack && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl">
           <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-6 py-3">
             {/* Track info */}
-            <div className="flex items-center gap-3 min-w-0 w-56 shrink-0">
+            <div className="flex items-center gap-3 min-w-0 w-52 shrink-0">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Disc3 className={`size-5 text-primary ${isPlaying ? "animate-spin" : ""}`} style={{ animationDuration: "3s" }} />
+                <Disc3 className={`size-5 text-primary ${tone.isPlaying ? "animate-spin" : ""}`} style={{ animationDuration: "3s" }} />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-foreground">{currentTrack.title}</p>
-                <p className="truncate text-[10px] text-muted-foreground">{currentTrack.artist}</p>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {currentTrack.artist} &middot; {currentTrack.bpm} BPM
+                </p>
               </div>
             </div>
 
-            {/* Controls */}
+            {/* Beat pulse indicator */}
+            <div className="hidden lg:block">
+              <BeatPulse currentBeat={beatDetector.currentBeat} isActive={tone.isPlaying} />
+            </div>
+
+            {/* Transport Controls */}
             <div className="flex flex-1 flex-col items-center gap-1.5">
               <div className="flex items-center gap-3">
                 <button
@@ -565,9 +574,9 @@ export default function HomePage() {
                 <button
                   onClick={togglePlay}
                   className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-                  aria-label={isPlaying ? "Pause" : "Play"}
+                  aria-label={tone.isPlaying ? "Pause" : "Play"}
                 >
-                  {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5 ml-0.5" />}
+                  {tone.isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5 ml-0.5" />}
                 </button>
                 <button
                   onClick={skipNext}
@@ -580,11 +589,11 @@ export default function HomePage() {
               {/* Scrubber */}
               <div className="flex w-full max-w-md items-center gap-2">
                 <span className="w-8 text-right text-[10px] font-mono text-muted-foreground">
-                  {formatTime(progress, currentTrack.duration)}
+                  {formatTime(tone.progress, currentTrack.duration)}
                 </span>
                 <Slider
-                  value={[progress]}
-                  onValueChange={([v]) => setProgress(v)}
+                  value={[tone.progress]}
+                  onValueChange={([v]) => tone.setProgress(v)}
                   min={0}
                   max={100}
                   step={0.1}
@@ -596,8 +605,18 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Live mini-spectrum */}
+            <div className="hidden w-20 shrink-0 md:block">
+              <SpectrumVisualizer
+                data={spectrum.spectrumData}
+                isPlaying={tone.isPlaying}
+                barCount={16}
+                height={28}
+              />
+            </div>
+
             {/* Volume */}
-            <div className="hidden items-center gap-2 w-36 shrink-0 sm:flex">
+            <div className="hidden items-center gap-2 w-32 shrink-0 sm:flex">
               <button
                 onClick={() => setIsMuted(!isMuted)}
                 className="text-muted-foreground transition-colors hover:text-foreground"
