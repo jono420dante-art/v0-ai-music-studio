@@ -12,15 +12,24 @@ import {
   Clock,
   Sparkles,
   Zap,
+  Video,
+  Home,
+  LayoutDashboard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
+const mainLinks = [
+  { href: "/", label: "Home", icon: Home },
+]
+
 const studioLinks = [
-  { href: "/create", label: "Create Music", icon: Sparkles, isNew: true },
+  { href: "/music-generator", label: "Music Studio", icon: Sparkles, isNew: true },
+  { href: "/video-generator", label: "Video Suite", icon: Video },
+  { href: "/create", label: "Quick Create", icon: LayoutDashboard },
   { href: "/lyrics", label: "Lyrics AI", icon: Mic2 },
   { href: "/stem-splitter", label: "Stem Splitter", icon: Scissors },
-  { href: "/mixer", label: "Mixer", icon: SlidersHorizontal },
+  { href: "/mixer", label: "Mixer Pro", icon: SlidersHorizontal },
 ]
 
 const discoverLinks = [
@@ -42,11 +51,35 @@ export function AppSidebar() {
         </div>
         <div>
           <h1 className="text-sm font-bold tracking-wide text-sidebar-foreground">DIETER PRO</h1>
-          <p className="text-[10px] tracking-widest text-muted-foreground">v2.4 PRO</p>
+          <p className="text-[10px] tracking-widest text-muted-foreground">AI Music Studio</p>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-2">
+      <nav className="flex-1 overflow-y-auto px-3 py-2">
+        {/* Main */}
+        <ul className="flex flex-col gap-0.5 mb-4">
+          {mainLinks.map((link) => {
+            const isActive = pathname === link.href
+            return (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-primary"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  )}
+                >
+                  <link.icon className="size-4" />
+                  {link.label}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+
+        {/* Studio */}
         <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Studio
         </p>
