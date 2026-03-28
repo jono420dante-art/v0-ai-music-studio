@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { 
-  ArrowRight, CheckCircle2, Music, Waveform, Upload, 
+  ArrowRight, CheckCircle2, Music, Upload,
   Download, Share2, Sparkles, Layers, Settings 
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,7 @@ export default function WorkflowPage() {
       steps: [
         { name: "Write or Generate Lyrics", icon: Sparkles, desc: "Use AI lyrics generator or write your own" },
         { name: "Choose Style & Voice", icon: Music, desc: "Select genre, mood, voice type and language" },
-        { name: "Generate Song", icon: Waveform, desc: "AI creates full track with vocals and instruments" },
+        { name: "Generate Song", icon: Music, desc: "AI creates full track with vocals and instruments" },
         { name: "Edit & Mix", icon: Layers, desc: "Adjust stems, add effects, professional mixing" },
         { name: "Master & Export", icon: Download, desc: "Final mastering and export in multiple formats" },
         { name: "Distribute", icon: Share2, desc: "Publish to Spotify, Apple Music, YouTube" }
