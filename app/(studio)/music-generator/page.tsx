@@ -1,341 +1,233 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Sparkles, Music, Mic2, Zap, Download, Play, Pause, 
-  Volume2, Settings, Share2, Heart, Trash2, RotateCcw,
-  CheckCircle2, AlertCircle, Headphones, Waves, Wind,
-  Layers, Palette, Layout, Wand2
-} from "lucide-react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToneEngine, useBeatDetector } from "@/hooks/use-tone-engine"
+import { 
+  Music, 
+  Mic2, 
+  Sparkles, 
+  Zap, 
+  RefreshCw, 
+  Plus, 
+  Play, 
+  Pause,
+  Maximize2,
+  Trash2,
+  Settings2,
+  Languages,
+  Ghost
+} from "lucide-react"
+import { SingingEngine } from "@/components/singing-engine"
 import { PlaybackModal } from "@/components/playback-modal"
-import { cn } from "@/lib/utils"
-
-// Advanced Vocal AI Simulation
-const SingingEngine = ({ lyrics, isPlaying, voiceType, bpm }: any) => {
-  const synthRef = useRef<any>(null)
-  
-  useEffect(() => {
-    if (isPlaying && lyrics) {
-      const synth = window.speechSynthesis
-      const utterance = new SpeechSynthesisUtterance(lyrics)
-      
-      // Select best voice
-      const voices = synth.getVoices()
-      const preferredVoices = voices.filter(v => 
-        v.name.includes("Google") || v.name.includes("Premium") || v.name.includes("Singing")
-      )
-      
-      utterance.voice = preferredVoices[0] || voices[0]
-      utterance.rate = (bpm / 120) * 0.9 // Sync rate with BPM
-      utterance.pitch = voiceType === "female" ? 1.4 : voiceType === "child" ? 1.8 : 0.8
-      utterance.volume = 1
-      
-      synth.speak(utterance)
-      synthRef.current = utterance
-    } else {
-      window.speechSynthesis.cancel()
-    }
-  }, [isPlaying, lyrics, voiceType, bpm])
-  
-  return null
-}
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function MusicGeneratorPage() {
+  const [lyrics, setLyrics] = useState("")
   const [prompt, setPrompt] = useState("")
-  const [lyrics, setLyrics] = useState("Walking through the city of neon dreams, 
-Everything is faster than it seems. 
-Heartbeat racing like a drum and bass, 
-Trying to find a piece of quiet space.")
-  const [selectedGenre, setSelectedGenre] = useState("Phonk")
-  const [selectedVoice, setSelectedVoice] = useState("female")
+  const [isInstrumental, setIsInstrumental] = useState(false)
+  const [vocalGender, setVocalGender] = useState<"female" | "male">("female")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  
-  const { play, stop, currentBpm } = useToneEngine()
+  const [selectedStyle, setSelectedStyle] = useState<string[]>([])
+  const [songTitle, setSongTitle] = useState("")
 
-  const handleGenerate = async () => {
-    if (!prompt) return
+  const styles = ["Sultry", "Latin Trap", "Slow Jam", "Electronic", "Jazz", "Pop", "Rock", "Country"]
+
+  const toggleStyle = (style: string) => {
+    setSelectedStyle(prev => 
+      prev.includes(style) ? prev.filter(s => s !== style) : [...prev, style]
+    )
+  }
+
+  const handleGenerate = () => {
     setIsGenerating(true)
-    setProgress(0)
-    
-    // Simulate generation stages
-    const stages = ["Analyzing mood", "Composing melody", "Arranging beats", "Generating vocals", "Mastering track"]
-    let currentStep = 0
-    
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsGenerating(false)
-          setIsModalOpen(true)
-          return 100
-        }
-        return prev + 2
-      })
-    }, 100)
+    setTimeout(() => {
+      setIsGenerating(false)
+      setIsModalOpen(true)
+    }, 3000)
+  }
+
+  const handleGenerateLyrics = () => {
+    setLyrics("In the neon glow of the midnight rain,
+We find our rhythm, we break the chain.
+Digital echoes in a cyber sea,
+Lost in the pulse of eternity.")
   }
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white p-8 font-sans selection:bg-indigo-500/40 overflow-hidden">
-      {/* Dynamic Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse delay-700" />
-      </div>
-
-      <div className="max-w-7xl mx-auto space-y-10 relative z-10">
-        {/* Header Section */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/[0.03] backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
-          <div className="flex items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/20 ring-1 ring-white/20">
-              <Sparkles className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tighter">VOCAL GEN MASTER</h1>
-              <p className="text-white/30 text-xs font-bold uppercase tracking-[0.3em]">AI Singing & Song Production</p>
-            </div>
+    <div className="min-h-screen bg-[#0a0a0c] text-white p-8">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left Sidebar: Controls (Mureka Style) */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="flex gap-2 p-1 bg-white/5 rounded-full w-fit">
+            <Button variant="ghost" className="rounded-full bg-white text-black hover:bg-white px-6">Custom</Button>
+            <Button variant="ghost" className="rounded-full text-white/60 hover:text-white px-6">Easy</Button>
           </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" className="text-white/40 hover:text-white rounded-xl px-5">
-              <RotateCcw className="h-4 w-4 mr-2" /> Reset
+
+          <div className="flex gap-4">
+            <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl">
+              <Plus className="mr-2 h-4 w-4" /> Reference
             </Button>
-            <Button className="bg-white text-black hover:bg-white/90 rounded-2xl px-8 font-bold h-12 shadow-xl">
-              Launch Studio Pro
+            <Button variant="outline" className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl">
+              <Plus className="mr-2 h-4 w-4" /> Vocal
             </Button>
           </div>
-        </header>
 
-        {/* Workspace Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Creative Input Panel */}
-          <div className="lg:col-span-8 space-y-8">
-            {/* Song description */}
-            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-10 space-y-8 shadow-2xl overflow-hidden group">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] -mr-32 -mt-32 rounded-full group-hover:bg-indigo-500/10 transition-colors duration-700" />
-              
-              <div className="space-y-6 relative z-10">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold flex items-center gap-3">
-                    <Music className="h-6 w-6 text-indigo-400" /> Song Architect
-                  </h2>
-                  <div className="flex gap-2">
-                    {["808", "Vintage", "Clear"].map(m => (
-                      <Badge key={m} variant="outline" className="border-white/10 text-white/40 text-[10px] uppercase px-2">{m}</Badge>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="relative">
-                  <Input 
-                    placeholder="Describe your song (e.g. 'Epic cinematic phonk with heavy bass...')"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    className="h-20 bg-black/40 border-white/10 rounded-3xl px-8 text-xl placeholder:text-white/10 focus:ring-2 ring-indigo-500/20 transition-all shadow-inner"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <Button variant="ghost" size="icon" className="text-white/20 hover:text-white"><Zap className="h-5 w-5" /></Button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {["Phonk", "Cyberpunk", "Dark Trap", "Lofi", "Techno"].map(genre => (
-                    <button 
-                      key={genre}
-                      onClick={() => setSelectedGenre(genre)}
-                      className={cn(
-                        "px-6 py-2.5 rounded-full text-sm font-bold border transition-all duration-300",
-                        selectedGenre === genre 
-                          ? "bg-white text-black border-white shadow-lg scale-105" 
-                          : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
-                      )}
-                    >
-                      {genre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-            {/* AI Lyric & Vocal Engine */}
-            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-10 space-y-8 shadow-2xl relative">
-              <div className="flex items-center justify-between relative z-10">
-                <h2 className="text-2xl font-bold flex items-center gap-3">
-                  <Mic2 className="h-6 w-6 text-pink-500" /> AI Vocal Suite
-                </h2>
-                <div className="flex items-center gap-4">
-                   <select 
-                    value={selectedVoice} 
-                    onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="bg-black/40 border border-white/10 text-white/80 rounded-xl px-4 py-2 text-sm outline-none"
-                   >
-                     <option value="female">Studio Female</option>
-                     <option value="male">Rich Baritone</option>
-                     <option value="child">Echo Child</option>
-                   </select>
-                   <Badge className="bg-pink-500/10 text-pink-400 border-none font-bold">HQ ENGINE</Badge>
-                </div>
-              </div>
-
-              <div className="relative group z-10">
-                <textarea 
-                  value={lyrics}
-                  onChange={(e) => setLyrics(e.target.value)}
-                  className="w-full h-64 bg-black/40 border border-white/10 rounded-[2rem] p-8 text-lg text-white/60 font-mono leading-relaxed focus:outline-none focus:border-pink-500/50 transition-all shadow-inner resize-none"
-                  placeholder="Paste your lyrics here or let AI generate them..."
+          <Card className="bg-[#141417] border-white/5 p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Lyrics</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40">Instrumental</span>
+                <Switch 
+                  checked={isInstrumental} 
+                  onCheckedChange={setIsInstrumental}
+                  className="data-[state=checked]:bg-indigo-500"
                 />
-                <Button className="absolute bottom-6 right-6 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 px-6 h-10 backdrop-blur-xl">
-                  <Wand2 className="h-4 w-4 mr-2" /> AI Write
-                </Button>
               </div>
+            </div>
+            
+            <Textarea 
+              placeholder="Enter lyrics here or leave blank for instrumental"
+              className="min-h-[200px] bg-black/40 border-white/5 focus-visible:ring-indigo-500 text-white placeholder:text-white/20"
+              value={lyrics}
+              onChange={(e) => setLyrics(e.target.value)}
+              disabled={isInstrumental}
+            />
 
-              <div className="flex items-center justify-between pt-4 relative z-10">
-                <div className="flex items-center gap-8">
-                  <button 
-                    onClick={() => {
-                      setIsPlaying(!isPlaying)
-                      if (!isPlaying) play(selectedGenre, 128)
-                      else stop()
-                    }}
-                    className={cn(
-                      "h-20 w-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ring-4 ring-white/5",
-                      isPlaying 
-                        ? "bg-pink-500 text-white scale-110 shadow-pink-500/40 rotate-90" 
-                        : "bg-white text-black hover:scale-105 active:scale-95"
-                    )}
-                  >
-                    {isPlaying ? <Pause className="h-10 w-10" /> : <Play className="h-10 w-10 ml-1.5" />}
-                  </button>
-                  <div>
-                    <p className="text-xl font-bold tracking-tight">Audio Synthesis Active</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs font-bold text-white/30 flex items-center gap-1">
-                        <Waves className="h-3 w-3" /> Real-time Vocals
-                      </span>
-                      <span className="text-xs font-bold text-white/30 flex items-center gap-1">
-                        <Headphones className="h-3 w-3" /> Studio Monitoring
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end gap-2">
-                  <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Master Volume</span>
-                  <div className="flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
-                    <Volume2 className="h-5 w-5 text-white/40" />
-                    <Slider defaultValue={[75]} max={100} className="w-32" />
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <div className="flex justify-between gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-white/40 hover:text-white"
+                onClick={() => setLyrics("")}
+              >
+                <RefreshCw className="mr-2 h-3 w-3" /> Optimize
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-indigo-400 hover:text-indigo-300"
+                onClick={handleGenerateLyrics}
+              >
+                <Sparkles className="mr-2 h-3 w-3" /> Generate Lyrics
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="bg-[#141417] border-white/5 p-6 space-y-4">
+            <span className="text-sm font-medium">Style</span>
+            <Textarea 
+              placeholder="Enter style, mood, instrument, etc."
+              className="min-h-[80px] bg-black/40 border-white/5 focus-visible:ring-indigo-500 text-white placeholder:text-white/20"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button size="icon" variant="ghost" className="rounded-full bg-white/5 h-8 w-8"><RefreshCw className="h-4 w-4"/></Button>
+              {styles.map(style => (
+                <Badge 
+                  key={style}
+                  variant="outline"
+                  className={`cursor-pointer px-3 py-1 border-white/10 transition-colors ${selectedStyle.includes(style) ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400' : 'hover:bg-white/5'}`}
+                  onClick={() => toggleStyle(style)}
+                >
+                  + {style}
+                </Badge>
+              ))}
+            </div>
+          </Card>
+
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm font-medium text-white/60">Vocal Gender</span>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setVocalGender('female')}
+                className={`text-sm ${vocalGender === 'female' ? 'text-white underline underline-offset-8 decoration-2' : 'text-white/40'}`}
+              >
+                Female
+              </button>
+              <button 
+                onClick={() => setVocalGender('male')}
+                className={`text-sm ${vocalGender === 'male' ? 'text-white underline underline-offset-8 decoration-2' : 'text-white/40'}`}
+              >
+                Male
+              </button>
+            </div>
           </div>
 
-          {/* Visualization & Actions Panel */}
-          <div className="lg:col-span-4 space-y-8">
-            {/* Generation Progress */}
-            <AnimatePresence>
-              {isGenerating && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                >
-                  <Card className="bg-indigo-600 border-none rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-500/30 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-                    <div className="relative z-10 space-y-6">
-                      <div className="flex justify-between items-end">
-                        <h3 className="text-3xl font-black italic">GENESIS</h3>
-                        <span className="text-4xl font-black opacity-40">{progress}%</span>
-                      </div>
-                      <div className="h-3 w-full bg-black/20 rounded-full overflow-hidden">
-                        <motion.div 
-                          className="h-full bg-white shadow-[0_0_20px_white]"
-                          initial={{ width: 0 }}
-                          animate={{ width: \`\${progress}%\` }}
-                        />
-                      </div>
-                      <p className="text-xs font-bold uppercase tracking-widest opacity-60">Synthesizing vocal patterns and arrangement...</p>
-                    </div>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <Card className="bg-[#141417] border-white/5 p-6 space-y-4">
+            <span className="text-sm font-medium">Song title</span>
+            <Input 
+              placeholder="Song title"
+              className="bg-black/40 border-white/5 focus-visible:ring-indigo-500 text-white"
+              value={songTitle}
+              onChange={(e) => setSongTitle(e.target.value)}
+            />
+          </Card>
 
-            {/* Mastering Controls */}
-            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-8 space-y-8 shadow-2xl">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <Palette className="h-5 w-5 text-indigo-400" /> Mastering Rack
-              </h3>
-              
-              <div className="space-y-6">
-                {[
-                  { label: "Vocal Clarity", val: 85, color: "bg-pink-500" },
-                  { label: "Bass Warmth", val: 92, color: "bg-indigo-500" },
-                  { label: "Reverb Tail", val: 40, color: "bg-purple-500" },
-                  { label: "Presence", val: 65, color: "bg-yellow-500" }
-                ].map((item, i) => (
-                  <div key={i} className="space-y-3">
-                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-white/40">
-                      <span>{item.label}</span>
-                      <span className="text-white/80">{item.val}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full">
-                      <div className={cn("h-full rounded-full shadow-[0_0_10px_currentColor]", item.color)} style={{ width: \`\${item.val}%\`, color: \`var(--\${item.color.split('-')[1]}-500)\` }} />
-                    </div>
-                  </div>
-                ))}
+          <Button 
+            className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <div className="flex items-center gap-3">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                <span>Generating...</span>
               </div>
-
-              <div className="pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
-                  <p className="text-[10px] font-bold text-white/20 uppercase mb-1">BPM</p>
-                  <p className="text-2xl font-black">128.0</p>
-                </div>
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
-                  <p className="text-[10px] font-bold text-white/20 uppercase mb-1">Key</p>
-                  <p className="text-2xl font-black">Cm</p>
-                </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Music className="h-5 w-5" />
+                <span>Create</span>
               </div>
-            </Card>
+            )}
+          </Button>
+        </div>
 
-            <Button 
-              onClick={handleGenerate}
-              disabled={isGenerating || !prompt}
-              className="w-full h-24 rounded-[2.5rem] bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-2xl shadow-2xl shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        {/* Right Content: Player/Empty State */}
+        <div className="lg:col-span-8 flex flex-col items-center justify-center min-h-[600px] border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
+          <div className="relative group cursor-pointer">
+            <div className="absolute inset-0 bg-indigo-500 blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity" />
+            <motion.div 
+              animate={{ rotate: isPlaying ? 360 : 0 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+              className="relative z-10 w-48 h-48 rounded-full bg-gradient-to-tr from-[#1a1a1e] to-[#2a2a2e] flex items-center justify-center border-4 border-white/10 shadow-2xl"
             >
-              {isGenerating ? "CREATING..." : "GENERATE SONG"}
-              <Sparkles className="ml-3 h-8 w-8 group-hover:rotate-12 transition-transform" />
-            </Button>
-            
-            <p className="text-center text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">
-              Powered by Dieter AI Audio v4.0 (2026)
+              <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                <Music className="h-6 w-6 text-indigo-400" />
+              </div>
+              <div className="absolute inset-0 rounded-full border border-white/5" />
+            </motion.div>
+          </div>
+          <div className="mt-12 text-center space-y-4">
+            <h3 className="text-xl font-semibold text-white/80">No songs yet, create one now!</h3>
+            <p className="text-white/40 max-w-sm mx-auto">
+              Your generated tracks will appear here. Use the sidebar to configure your lyrics, style, and vocals.
             </p>
           </div>
         </div>
+
       </div>
 
-      {/* Secret Singing Engine */}
+      {/* Hidden Engines */}
       <SingingEngine 
-        lyrics={lyrics} 
-        isPlaying={isPlaying} 
-        voiceType={selectedVoice} 
-        bpm={128} 
+        lyrics={lyrics}
+        isPlaying={isPlaying}
+        voiceType={vocalGender === 'female' ? 'female' : 'male'}
+        bpm={128}
       />
-
       <PlaybackModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        songTitle={prompt || "Cybernetic Skyline"} 
-        lyrics={lyrics} 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        songTitle={songTitle || "Cybernetic Serenade"}
+        lyrics={lyrics || "Sample generated lyrics for your amazing new AI track."}
       />
     </div>
   )
