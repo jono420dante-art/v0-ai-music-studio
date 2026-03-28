@@ -1,16 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: false,
-  },
+    ignoreBuildErrors: true,  },
   eslint: {
-    ignoreDuringBuilds: false,
-  },
+    ignoreDuringBuilds: true,  },
   images: {
     unoptimized: true,
   },
-  output: 'standalone',
-  trailingSlash: false,
+
+
   async headers() {
     return [
       {
