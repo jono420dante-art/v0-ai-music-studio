@@ -1,190 +1,207 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X, Sparkles, Lightbulb, TrendingUp, Zap, MessageSquare, ChevronDown, ChevronUp } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { 
+  X, Sparkles, Lightbulb, TrendingUp, Zap, MessageSquare, 
+  Bot, User, Send, ChevronRight, Wand2, RefreshCcw, 
+  Terminal, Code2, Layout, Palette, Music, Mic2
+} from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 
-interface AIDirectorProps {
-  context?: "home" | "create" | "studio" | "workflow" | "features" | "my-songs"
-  userAction?: string
-  songData?: any
+interface Message {
+  id: string;
+  role: "agent" | "user";
+  text: string;
+  timestamp: Date;
+  suggestions?: string[];
+  action?: string;
 }
 
-export function AIDirector({ context = "home", userAction, songData }: AIDirectorProps) {
+export default function MusicDesignAgent() {
   const [isOpen, setIsOpen] = useState(true)
-  const [isMinimized, setIsMinimized] = useState(false)
-  const [currentTip, setCurrentTip] = useState(0)
-  const [chatMessages, setChatMessages] = useState<Array<{role: "director" | "user", text: string}>>([]
-)
-
-  const contextualAdvice = {
-    home: [
-      { icon: Sparkles, title: "Pro Tip", text: "Start with a clear vision of your song's mood and genre. The AI performs best with specific prompts like 'upbeat electronic pop with female vocals' rather than vague descriptions." },
-      { icon: TrendingUp, title: "Trending", text: "Songs with BPM between 120-140 are currently trending. Consider electronic, pop, or hip-hop genres for maximum engagement." },
-      { icon: Lightbulb, title: "Quick Win", text: "Use the 'Quick Actions' panel to jumpstart your creativity. Try 'Make a song' and describe your idea in natural language." }
-    ],
-    create: [
-      { icon: Sparkles, title: "Director's Advice", text: "For best results: Be specific about genre, mood, and vocal style. Example: 'Create an energetic indie rock song with raspy male vocals, tempo 145 BPM, about overcoming challenges'" },
-      { icon: Zap, title: "Pro Technique", text: "Layer your production: Start with the core song, then use stem separation to isolate vocals, add your own instrumentation, and remix for a unique sound." },
-      { icon: Lightbulb, title: "Creative Boost", text: "Stuck on lyrics? Try our AI Lyrics Generator first. It creates professional, rhyming lyrics in any style. Then generate music to match!" },
-      { icon: TrendingUp, title: "Industry Standard", text: "Professional songs typically have: Intro (0-8s), Verse 1 (8-24s), Chorus (24-40s), Verse 2 (40-56s), Chorus (56-72s), Bridge (72-88s), Final Chorus (88-120s). Structure your prompts accordingly." }
-    ],
-    studio: [
-      { icon: Zap, title: "Mixing Pro Tip", text: "Always leave headroom! Keep your master fader at -6dB to -3dB to avoid clipping during final mastering." },
-      { icon: Lightbulb, title: "EQ Guidance", text: "Start with subtractive EQ (cutting problem frequencies) before additive EQ (boosting). Cut before you boost saves your mix from muddiness." },
-      { icon: Sparkles, title: "Vocals Clarity", text: "Boost around 3-5kHz for vocal presence. Cut around 200-400Hz to reduce muddiness. Add gentle compression (3:1 ratio) for consistency." },
-      { icon: TrendingUp, title: "Stems Workflow", text: "Separate your track into stems (vocals, drums, bass, instruments) for professional mixing. Apply effects to individual stems for cleaner results." }
-    ],
-    workflow: [
-      { icon: Lightbulb, title: "Efficient Workflow", text: "Professional workflow: 1) Write/generate lyrics, 2) Choose style & voice, 3) Generate initial track, 4) Separate stems, 5) Mix & master, 6) Distribute. Each step builds on the previous." },
-      { icon: Sparkles, title: "Time Saver", text: "Batch process multiple variations! Generate 3-4 versions with slight prompt variations, then pick the best one to refine." }
-    ],
-    features: [
-      { icon: Zap, title: "Feature Highlight", text: "Voice Cloning is incredibly powerful: Upload just 10 seconds of any voice, and clone it in 50+ languages. Perfect for multilingual content." },
-      { icon: TrendingUp, title: "Distribution", text: "Use our direct distribution to Spotify, Apple Music, and YouTube. Your songs can go live in 24-48 hours with proper metadata." }
-    ],
-    "my-songs": [
-      { icon: Lightbulb, title: "Organization Tip", text: "Tag your songs with genre, mood, and project names. This makes finding and managing your library much easier as it grows." },
-      { icon: Sparkles, title: "Monetization", text: "Songs with professional mixing and mastering sell better. Consider running your top tracks through our mastering suite before publishing to marketplaces." },
-      { icon: TrendingUp, title: "Analytics", text: "Track your song performance! Songs with engaging intros (first 5 seconds) have 3x higher retention rates." }
-    ]
-  }
-
-  const tips = contextualAdvice[context] || contextualAdvice.home
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      role: "agent",
+      text: "Greetings, I am your Dieter Music Design Agent. I've analyzed your current session. Would you like me to design a vocal structure for your 'Cybernetic Skyline' track?",
+      timestamp: new Date(),
+      suggestions: ["Synthesize Female Vocals", "Draft Phonk Lyrics", "Optimize Mixing Rack"]
+    }
+  ])
+  const [inputValue, setInputValue] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTip((prev) => (prev + 1) % tips.length)
-    }, 15000) // Rotate tips every 15 seconds
-    return () => clearInterval(interval)
-  }, [tips.length])
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages, isTyping])
 
-  useEffect(() => {
-    if (userAction) {
-      const advice = generateContextualAdvice(userAction, context, songData)
-      if (advice) {
-        setChatMessages(prev => [...prev, { role: "director", text: advice }])
+  const handleSend = (text: string = inputValue) => {
+    if (!text.trim()) return
+    
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      text,
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMsg])
+    setInputValue("")
+    setIsTyping(true)
+
+    // Simulate agent "design intelligence"
+    setTimeout(() => {
+      const agentMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "agent",
+        text: getAgentResponse(text),
+        timestamp: new Date(),
+        suggestions: getSuggestions(text)
       }
-    }
-  }, [userAction, context, songData])
-
-  const generateContextualAdvice = (action: string, ctx: string, data?: any): string | null => {
-    const adviceMap: Record<string, string> = {
-      "started-generation": "Great! Your song is generating. This typically takes 60-120 seconds. While you wait, consider what edits you might want to make—vocal adjustments, tempo changes, or stem separation for remixing.",
-      "lyrics-generated": "Perfect! Now that you have lyrics, review them for flow and meaning. You can regenerate specific sections or edit manually before creating the music.",
-      "song-completed": "Excellent work! Your song is ready. Next steps: 1) Listen critically for any issues, 2) Use stem separation if you want to remix, 3) Apply mastering for professional sound, 4) Export and distribute!",
-      "editing-stems": "Pro mode activated! When editing stems: Focus on one element at a time. Start with vocals (clarity and presence), then drums (punch and space), then bass (low-end control), finally other instruments.",
-      "exporting": "Export Tips: Use WAV (44.1kHz/16-bit minimum) for distribution. MP3 320kbps for demos. Always export stems separately if you might need them later!"
-    }
-    return adviceMap[action] || null
+      setMessages(prev => [...prev, agentMsg])
+      setIsTyping(false)
+    }, 1500)
   }
 
-  if (!isOpen) return null
+  const getAgentResponse = (input: string) => {
+    const text = input.toLowerCase()
+    if (text.includes("vocal") || text.includes("sing")) {
+      return "Design Intelligence initialized. I've mapped a female vocal pattern to your 128 BPM tempo. Syncing with the Singing Engine now. Shall I also add a 'Glow' effect to the high-end?"
+    }
+    if (text.includes("lyrics")) {
+      return "I've drafted a structure using 4-bar stanzas. The mood is set to 'Atmospheric'. Should I refine the rhyming scheme for the chorus?"
+    }
+    return "Understood. I'm applying spatial design reasoning to your project structure. Every element is now aligned for professional-grade output."
+  }
 
-  if (isMinimized) {
-    return (
-      <button
-        onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl"
-      >
-        <Sparkles className="size-4" />
-        AI Director
-        <ChevronUp className="size-4" />
-      </button>
-    )
+  const getSuggestions = (input: string) => {
+    const text = input.toLowerCase()
+    if (text.includes("vocal")) return ["Apply Glow FX", "Change to Male Baritone", "Export Vocal Stems"]
+    return ["Optimize Layout", "Regenerate Melody", "Check Mastering Quality"]
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 rounded-2xl border border-border bg-card shadow-2xl">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-purple-600/10 to-pink-600/10 p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-r from-purple-600 to-pink-600">
-            <Sparkles className="size-4 text-white" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold">AI Director</h3>
-            <p className="text-[10px] text-muted-foreground">Your Creative Guide</p>
-          </div>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsMinimized(true)}
-            className="size-8 p-0"
+    <div className="fixed bottom-10 right-10 z-[100]">
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="w-96 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col h-[600px] ring-1 ring-white/5"
           >
-            <ChevronDown className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsOpen(false)}
-            className="size-8 p-0"
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-indigo-600/10 to-purple-600/10 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                   <Bot className="h-6 w-6 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest leading-none">Design Agent</h3>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-white/40 uppercase">Lokuma Intelligence Layer</span>
+                  </div>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-xl text-white/20 hover:text-white">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Chat Area */}
+            <ScrollArea className="flex-1 p-6 space-y-6 overflow-y-auto custom-scrollbar" ref={scrollRef}>
+              <div className="space-y-6 pb-4">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={cn(
+                    "flex flex-col gap-3",
+                    msg.role === "user" ? "items-end" : "items-start"
+                  )}>
+                    <div className={cn(
+                      "max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed",
+                      msg.role === "user" 
+                        ? "bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10 font-medium" 
+                        : "bg-white/5 text-white/80 rounded-tl-none border border-white/10"
+                    )}>
+                      {msg.text}
+                    </div>
+                    {msg.suggestions && msg.suggestions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {msg.suggestions.map((s, i) => (
+                          <button 
+                            key={i}
+                            onClick={() => handleSend(s)}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-indigo-400 transition-all"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="flex gap-2 p-3 bg-white/5 rounded-2xl border border-white/5 w-16">
+                    <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 bg-indigo-500 rounded-full animate-bounce" />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Input Area */}
+            <div className="p-6 pt-0">
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-2 flex items-center gap-2 focus-within:border-indigo-500/50 transition-all shadow-inner">
+                <Input 
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  placeholder="Ask me to design your track..."
+                  className="bg-transparent border-none focus-visible:ring-0 text-xs font-medium placeholder:text-white/20 h-10"
+                />
+                <Button 
+                  onClick={() => handleSend()}
+                  size="icon" 
+                  className="h-10 w-10 rounded-xl bg-white text-black hover:bg-white/90 shadow-xl"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                 {[
+                   { icon: Layout, label: "Layout" },
+                   { icon: Palette, label: "Style" },
+                   { icon: Music, label: "Music" },
+                   { icon: Mic2, label: "Vocal" }
+                 ].map((tool, i) => (
+                   <button key={i} className="flex flex-col items-center gap-1.5 p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all group">
+                      <tool.icon className="h-3 w-3 text-white/20 group-hover:text-indigo-400" />
+                      <span className="text-[8px] font-bold uppercase tracking-widest text-white/20">{tool.label}</span>
+                   </button>
+                 ))}
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={() => setIsOpen(true)}
+            className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/40 ring-2 ring-white/20 group hover:scale-110 transition-all"
           >
-            <X className="size-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Current Tip */}
-      <div className="border-b border-border p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            {(() => {
-              const Icon = tips[currentTip].icon
-              return <Icon className="size-5 text-primary" />
-            })()}
-          </div>
-          <div className="flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px]">{tips[currentTip].title}</Badge>
-              <span className="text-[10px] text-muted-foreground">{currentTip + 1}/{tips.length}</span>
-            </div>
-            <p className="text-xs leading-relaxed text-foreground">{tips[currentTip].text}</p>
-          </div>
-        </div>
-        {/* Tip Navigation */}
-        <div className="mt-3 flex gap-1">
-          {tips.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentTip(i)}
-              className={`h-1 flex-1 rounded-full transition-all ${
-                i === currentTip ? "bg-primary" : "bg-muted"
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Chat Messages */}
-      {chatMessages.length > 0 && (
-        <div className="max-h-48 space-y-2 overflow-y-auto border-b border-border p-4">
-          {chatMessages.map((msg, i) => (
-            <div key={i} className="flex gap-2">
-              <MessageSquare className="size-4 shrink-0 text-primary" />
-              <p className="text-xs text-muted-foreground">{msg.text}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="p-4">
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Quick Actions</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" className="justify-start text-xs" onClick={() => setChatMessages(prev => [...prev, { role: "director", text: "Great question! For your first song, I recommend starting with a genre you love. Be specific: instead of 'pop song', try 'upbeat synth-pop with energetic female vocals, 128 BPM, about summer adventures'. The more details, the better the result!" }])}>
-            <Lightbulb className="mr-1.5 size-3" />
-            Get Advice
-          </Button>
-          <Button variant="outline" size="sm" className="justify-start text-xs" onClick={() => setCurrentTip((prev) => (prev + 1) % tips.length)}>
-            <Sparkles className="mr-1.5 size-3" />
-            Next Tip
-          </Button>
-        </div>
-      </div>
+            <Bot className="h-8 w-8 text-white group-hover:rotate-12 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
