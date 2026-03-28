@@ -1,3 +1,5 @@
+"use client"
+
 import { AppSidebar } from "@/components/app-sidebar"
 
 export default function StudioLayout({
@@ -6,9 +8,23 @@ export default function StudioLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-[#020202] text-white">
+      {/* Immersive Sidebar */}
       <AppSidebar />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      
+      {/* Main Content Area */}
+      <main className="flex-1 relative overflow-y-auto overflow-x-hidden scroll-smooth bg-gradient-to-b from-black via-[#050505] to-black">
+        {/* Atmosphere Layer */}
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-500/10 blur-[150px] -mr-96 -mt-96 rounded-full" />
+           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-500/5 blur-[120px] -ml-48 -mb-48 rounded-full" />
+        </div>
+        
+        {/* Content Wrapper */}
+        <div className="relative z-10">
+          {children}
+        </div>
+      </main>
     </div>
   )
 }
