@@ -1,73 +1,201 @@
-{
-  "name": "my-project",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@vercel/analytics": "1.6.1",
-    "@radix-ui/react-accordion": "1.2.12",
-    "@radix-ui/react-alert-dialog": "1.1.15",
-    "@radix-ui/react-aspect-ratio": "1.1.8",
-    "@radix-ui/react-avatar": "1.1.11",
-    "@radix-ui/react-checkbox": "1.3.3",
-    "@radix-ui/react-collapsible": "1.1.12",
-    "@radix-ui/react-context-menu": "2.2.16",
-    "@radix-ui/react-dialog": "1.1.15",
-    "@radix-ui/react-dropdown-menu": "2.1.16",
-    "@radix-ui/react-hover-card": "1.1.15",
-    "@radix-ui/react-label": "2.1.8",
-    "@radix-ui/react-menubar": "1.1.16",
-    "@radix-ui/react-navigation-menu": "1.2.14",
-    "@radix-ui/react-popover": "1.1.15",
-    "@radix-ui/react-progress": "1.1.8",
-    "@radix-ui/react-radio-group": "1.3.8",
-    "@radix-ui/react-scroll-area": "1.2.10",
-    "@radix-ui/react-select": "2.2.6",
-    "@radix-ui/react-separator": "1.1.8",
-    "@radix-ui/react-slider": "1.3.6",
-    "@radix-ui/react-slot": "1.2.4",
-    "@radix-ui/react-switch": "1.2.6",
-    "@radix-ui/react-tabs": "1.1.13",
-    "@radix-ui/react-toast": "1.2.15",
-    "@radix-ui/react-toggle": "1.1.10",
-    "@radix-ui/react-toggle-group": "1.1.11",
-    "@radix-ui/react-tooltip": "1.2.8",
-    "autoprefixer": "^10.4.20",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "1.1.1",
-    "date-fns": "4.1.0",
-    "embla-carousel-react": "8.6.0",
-    "input-otp": "1.4.2",
-    "lucide-react": "^0.564.0",
-    "next": "16.1.6",
-    "next-themes": "^0.4.6",
-    "react": "19.2.4",
-    "react-day-picker": "9.13.2",
-    "react-dom": "19.2.4",
-    "react-hook-form": "^7.54.1",
-    "react-resizable-panels": "^2.1.7",
-    "recharts": "2.15.0",
-    "sonner": "^1.7.1",
-    "tone": "^15.0.4",
-    "tailwind-merge": "^3.3.1",
-    "vaul": "^1.1.2",
-    "zod": "^3.24.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.0",
-    "@types/node": "^22",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "postcss": "^8.5",
-    "tailwindcss": "^4.2.0",
-    "tw-animate-css": "1.3.3",
-    "typescript": "5.7.3"
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { 
+  Sparkles, Music, Mic2, Zap, Download, Clock, 
+  Play, Pause, Volume2, Settings, Share2, Heart,
+  LayoutDashboard, Library, Compass, Search
+} from "lucide-react"
+import { useToneEngine, useBeatDetector } from "@/hooks/use-tone-engine"
+import { SpectrumVisualizer, BeatPulse, BeatGrid } from "@/components/audio-visualizer"
+
+// Vocal Synthesis Integration (Web Speech API + Mock AI)
+const VocalEngine = ({ lyrics, isPlaying }: { lyrics: string, isPlaying: boolean }) => {
+  useEffect(() => {
+    if (isPlaying && lyrics) {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(lyrics);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      synth.speak(utterance);
+    } else {
+      window.speechSynthesis.cancel();
+    }
+  }, [isPlaying, lyrics]);
+  return null;
+}
+
+export default function StudioPage() {
+  const [prompt, setPrompt] = useState("")
+  const [lyrics, setLyrics] = useState("Enter your song lyrics here...")
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const { beats } = useBeatDetector()
+  
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    // Simulate generation for UI feedback
+    setTimeout(() => setIsGenerating(false), 3000)
   }
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white p-6 font-sans">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <header className="flex items-center justify-between bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Music className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">DIETER STUDIO</h1>
+              <p className="text-white/40 text-xs uppercase tracking-widest">Next-Gen AI Production</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="text-white/40 hover:text-white hover:bg-white/5">
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button className="bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10">
+              Launch Pro Console
+            </Button>
+          </div>
+        </header>
+
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left Column: Input & Controls */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Generator Card */}
+            <Card className="bg-white/5 border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-indigo-400" /> AI Creative Engine
+                  </h2>
+                  <p className="text-white/40 text-sm">Describe the soul of your next masterpiece</p>
+                </div>
+                
+                <div className="relative group">
+                  <Input 
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="E.g. Atmospheric cinematic techno with heavy bass and ethereal female vocals..."
+                    className="h-16 bg-black/40 border-white/5 rounded-2xl px-6 text-lg placeholder:text-white/20 focus:border-indigo-500/50 transition-all duration-300"
+                  />
+                  <Button 
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    className="absolute right-2 top-2 h-12 px-8 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 shadow-lg shadow-indigo-500/20"
+                  >
+                    {isGenerating ? "Synthesizing..." : "Generate"}
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {["808 Bass", "Lofi Beats", "Phonk", "Synthwave", "Jazz Fusion"].map(tag => (
+                    <Badge key={tag} variant="secondary" className="bg-white/5 hover:bg-white/10 border-white/5 cursor-pointer py-1.5 px-3">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </Card>
+
+            {/* Vocal Section */}
+            <Card className="bg-white/5 border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Mic2 className="h-5 w-5 text-pink-400" /> Vocal Synthesis
+                </h2>
+                <Badge className="bg-pink-500/10 text-pink-400 border-pink-500/20 px-3">BETA</Badge>
+              </div>
+              <textarea 
+                value={lyrics}
+                onChange={(e) => setLyrics(e.target.value)}
+                className="w-full h-40 bg-black/40 border border-white/5 rounded-2xl p-6 text-white/60 focus:outline-none focus:border-pink-500/50 transition-all resize-none font-mono text-sm leading-relaxed"
+              />
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-4 items-center">
+                  <Button 
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-all ${isPlaying ? 'bg-pink-500 shadow-pink-500/40' : 'bg-white/10 hover:bg-white/20'}`}
+                  >
+                    {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-1" />}
+                  </Button>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Preview Vocals</p>
+                    <p className="text-xs text-white/40">Powered by Web Speech Engine</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                  <Volume2 className="h-4 w-4 text-white/40" />
+                  <div className="h-1 w-24 bg-white/10 rounded-full relative">
+                    <div className="absolute inset-y-0 left-0 w-3/4 bg-pink-500 rounded-full shadow-[0_0_8px_rgba(236,72,153,0.5)]" />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Right Column: Visualizers & Stats */}
+          <div className="lg:col-span-4 space-y-8">
+            {/* Beatnet Card */}
+            <Card className="bg-white/5 border-white/10 rounded-3xl p-6 space-y-6 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Zap className="h-24 w-24 text-yellow-500" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium uppercase tracking-widest text-white/40">Beatnet Pulse</h3>
+                <p className="text-2xl font-bold">128.4 <span className="text-xs text-yellow-500">BPM</span></p>
+              </div>
+              <div className="h-32 flex items-end gap-1.5 px-2">
+                {[...Array(24)].map((_, i) => (
+                  <div key={i} className="flex-1 bg-yellow-500/20 rounded-full overflow-hidden relative">
+                    <div 
+                      className="absolute bottom-0 w-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)] transition-all duration-300"
+                      style={{ height: \`\${Math.random() * 80 + 20}%\` }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button className="w-full bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 rounded-xl py-6">
+                Sync Visuals to Beat
+              </Button>
+            </Card>
+
+            {/* Project Stats */}
+            <Card className="bg-white/5 border-white/10 rounded-3xl p-6 space-y-6 shadow-2xl">
+              <h3 className="font-semibold text-white/80">Project Overview</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <span className="text-sm text-white/40">SEO Quality</span>
+                  <Badge className="bg-green-500/10 text-green-400 border-green-500/20">Excellent</Badge>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <span className="text-sm text-white/40">Est. Reach</span>
+                  <span className="text-sm font-mono text-indigo-400">842K plays</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <span className="text-sm text-white/40">Model Strength</span>
+                  <span className="text-sm font-mono text-purple-400">High Fidelity</span>
+                </div>
+              </div>
+            </Card>
+
+            <Button className="w-full h-16 rounded-3xl bg-white text-black hover:bg-white/90 font-bold text-lg shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+              Finalize & Export
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Hidden Engines */}
+      <VocalEngine lyrics={lyrics} isPlaying={isPlaying} />
+    </div>
+  )
 }

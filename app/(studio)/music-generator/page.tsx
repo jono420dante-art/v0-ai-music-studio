@@ -1,491 +1,342 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Sparkles,
-  Lightbulb,
-  Gauge,
-  SlidersHorizontal,
-  ChevronDown,
-  ChevronUp,
-  Zap,
-  Play,
-  Pause,
-  Square,
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { 
+  Sparkles, Music, Mic2, Zap, Download, Play, Pause, 
+  Volume2, Settings, Share2, Heart, Trash2, RotateCcw,
+  CheckCircle2, AlertCircle, Headphones, Waves, Wind,
+  Layers, Palette, Layout, Wand2
 } from "lucide-react"
-import { useToneEngine, useSpectrum, useBeatDetector } from "@/hooks/use-tone-engine"
-import { SpectrumVisualizer, BeatPulse, BeatGrid } from "@/components/audio-visualizer"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Slider } from "@/components/ui/slider"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useToneEngine, useBeatDetector } from "@/hooks/use-tone-engine"
+import { PlaybackModal } from "@/components/playback-modal"
+import { cn } from "@/lib/utils"
 
-/* ─── Genre list (16 genres) ─── */
-const genres = [
-  "Afro House", "Cinematic", "Lo-Fi", "EDM", "Hip-Hop", "Jazz",
-  "Ambient", "Pop", "Techno", "Trap", "R&B", "Soul",
-  "Indie", "Metal", "Classical", "Reggae",
-]
-
-/* ─── Mood Grid (20 moods with instrument tags) ─── */
-const moodGrid = [
-  { mood: "Energetic", tag: "Mixer Board" },
-  { mood: "Calm", tag: "Equalizer" },
-  { mood: "Uplifting", tag: "Microphone" },
-  { mood: "Dark", tag: "Headphones" },
-  { mood: "Melancholic", tag: "Synthesizer" },
-  { mood: "Joyful", tag: "Guitar" },
-  { mood: "Mysterious", tag: "Drums" },
-  { mood: "Dreamy", tag: "Sheet Music" },
-  { mood: "Aggressive", tag: "Amplifier" },
-  { mood: "Peaceful", tag: "Speaker" },
-  { mood: "Epic", tag: "Orchestra" },
-  { mood: "Ambient", tag: "Reverb" },
-  { mood: "Funky", tag: "Trumpet" },
-  { mood: "Romantic", tag: "Violin" },
-  { mood: "Cinematic", tag: "Film Score" },
-  { mood: "Psychedelic", tag: "Effects Pedal" },
-  { mood: "Minimalist", tag: "Sine Wave" },
-  { mood: "Tribal", tag: "Percussion" },
-  { mood: "Ethereal", tag: "Pad Synth" },
-  { mood: "Industrial", tag: "Synthesizer" },
-]
-
-/* ─── Audio Quality Options ─── */
-const audioQualities = [
-  { value: "128", label: "128kbps" },
-  { value: "192", label: "192kbps" },
-  { value: "256", label: "256kbps" },
-  { value: "320", label: "320kbps" },
-  { value: "flac", label: "FLAC (Lossless)" },
-  { value: "wav", label: "WAV (Studio)" },
-]
-
-/* ─── BPM presets per genre ─── */
-const genreBPM: Record<string, number> = {
-  "Afro House": 120, "Cinematic": 80, "Lo-Fi": 85, "EDM": 128,
-  "Hip-Hop": 90, "Jazz": 110, "Ambient": 70, "Pop": 120,
-  "Techno": 130, "Trap": 140, "R&B": 95, "Soul": 100,
-  "Indie": 115, "Metal": 160, "Classical": 100, "Reggae": 80,
+// Advanced Vocal AI Simulation
+const SingingEngine = ({ lyrics, isPlaying, voiceType, bpm }: any) => {
+  const synthRef = useRef<any>(null)
+  
+  useEffect(() => {
+    if (isPlaying && lyrics) {
+      const synth = window.speechSynthesis
+      const utterance = new SpeechSynthesisUtterance(lyrics)
+      
+      // Select best voice
+      const voices = synth.getVoices()
+      const preferredVoices = voices.filter(v => 
+        v.name.includes("Google") || v.name.includes("Premium") || v.name.includes("Singing")
+      )
+      
+      utterance.voice = preferredVoices[0] || voices[0]
+      utterance.rate = (bpm / 120) * 0.9 // Sync rate with BPM
+      utterance.pitch = voiceType === "female" ? 1.4 : voiceType === "child" ? 1.8 : 0.8
+      utterance.volume = 1
+      
+      synth.speak(utterance)
+      synthRef.current = utterance
+    } else {
+      window.speechSynthesis.cancel()
+    }
+  }, [isPlaying, lyrics, voiceType, bpm])
+  
+  return null
 }
 
 export default function MusicGeneratorPage() {
   const [prompt, setPrompt] = useState("")
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
-  const [selectedMoods, setSelectedMoods] = useState<string[]>([])
-  const [duration, setDuration] = useState([30])
-  const [compression, setCompression] = useState([50])
-  const [reverb, setReverb] = useState([30])
-  const [delay, setDelay] = useState([20])
-  const [audioQuality, setAudioQuality] = useState("320")
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [masterGain, setMasterGain] = useState([0])
-  const [stereoWidth, setStereoWidth] = useState([100])
-  const [bass, setBass] = useState([50])
-  const [treble, setTreble] = useState([50])
+  const [lyrics, setLyrics] = useState("Walking through the city of neon dreams, 
+Everything is faster than it seems. 
+Heartbeat racing like a drum and bass, 
+Trying to find a piece of quiet space.")
+  const [selectedGenre, setSelectedGenre] = useState("Phonk")
+  const [selectedVoice, setSelectedVoice] = useState("female")
   const [isGenerating, setIsGenerating] = useState(false)
-  const [hasGenerated, setHasGenerated] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  const { play, stop, currentBpm } = useToneEngine()
 
-  const tone = useToneEngine()
-  const spectrum = useSpectrum(32)
-  const beatDetector = useBeatDetector()
-
-  const toggleMood = (mood: string) => {
-    setSelectedMoods((prev) =>
-      prev.includes(mood) ? prev.filter((m) => m !== mood) : [...prev, mood]
-    )
+  const handleGenerate = async () => {
+    if (!prompt) return
+    setIsGenerating(true)
+    setProgress(0)
+    
+    // Simulate generation stages
+    const stages = ["Analyzing mood", "Composing melody", "Arranging beats", "Generating vocals", "Mastering track"]
+    let currentStep = 0
+    
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          setIsGenerating(false)
+          setIsModalOpen(true)
+          return 100
+        }
+        return prev + 2
+      })
+    }, 100)
   }
 
-  const handleGenerate = useCallback(async () => {
-    setIsGenerating(true)
-    // Simulate generation time then play Tone.js preview
-    setTimeout(async () => {
-      setIsGenerating(false)
-      setHasGenerated(true)
-      const genreKey = selectedGenre?.toLowerCase().replace(/\s+/g, "-") || "default"
-      const bpm = selectedGenre ? genreBPM[selectedGenre] || 120 : 120
-      const synthType = selectedMoods.includes("Dark") || selectedMoods.includes("Aggressive")
-        ? "bass" as const
-        : selectedMoods.includes("Dreamy") || selectedMoods.includes("Ethereal")
-          ? "pad" as const
-          : "lead" as const
-      await tone.playSequence(genreKey, bpm, synthType)
-      spectrum.start()
-      beatDetector.startDetection()
-    }, 2000)
-  }, [selectedGenre, selectedMoods, tone, spectrum, beatDetector])
-
-  const handlePreviewToggle = useCallback(async () => {
-    if (tone.isPlaying) {
-      tone.pause()
-      spectrum.stop()
-      beatDetector.stopDetection()
-    } else {
-      await tone.resume()
-      spectrum.start()
-      beatDetector.startDetection()
-    }
-  }, [tone, spectrum, beatDetector])
-
-  const handleStop = useCallback(() => {
-    tone.stop()
-    spectrum.stop()
-    beatDetector.stopDetection()
-  }, [tone, spectrum, beatDetector])
-
-  /* Dynamic suggestion */
-  const suggestion = selectedGenre
-    ? `Try ${selectedGenre} + ${selectedMoods[0] || "Energetic"} for maximum impact`
-    : "Select a genre and mood to get AI suggestions"
-
-  const qualityLabel = audioQualities.find((q) => q.value === audioQuality)?.label || "320kbps"
-
   return (
-    <div className="flex h-full">
-      {/* ─── Left Panel: AI Director ─── */}
-      <div className="w-72 shrink-0 border-r border-border bg-card/50">
-        <ScrollArea className="h-full">
-          <div className="flex flex-col gap-3 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              AI Director
-            </p>
-
-            {/* Suggestion Card */}
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <Lightbulb className="size-3.5 text-primary" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">Suggestion</span>
-              </div>
-              <p className="text-xs text-foreground leading-relaxed">{suggestion}</p>
-            </div>
-
-            {/* Beat Detection Card (BeatNet-inspired) */}
-            <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <Zap className="size-3.5 text-chart-3" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-chart-3">
-                  BeatNet Detector
-                </span>
-              </div>
-              {beatDetector.isDetecting ? (
-                <div className="flex flex-col gap-2">
-                  <BeatPulse currentBeat={beatDetector.currentBeat} isActive={true} />
-                  <BeatGrid beats={beatDetector.beats} maxBeats={16} />
-                  <p className="text-[10px] text-muted-foreground">
-                    {beatDetector.beats.length} beats detected
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-foreground leading-relaxed">
-                  Generate a track to detect beats and tempo in real-time
-                </p>
-              )}
-            </div>
-
-            {/* Live Spectrum */}
-            <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <SlidersHorizontal className="size-3.5 text-muted-foreground" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Output Spectrum
-                </span>
-              </div>
-              <SpectrumVisualizer
-                data={spectrum.spectrumData}
-                isPlaying={tone.isPlaying}
-                barCount={24}
-                height={36}
-              />
-            </div>
-
-            {/* Quality Card */}
-            <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="mb-1.5 flex items-center gap-2">
-                <Gauge className="size-3.5 text-muted-foreground" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Quality</span>
-              </div>
-              <p className="text-xs text-foreground">
-                Generating at {qualityLabel} {audioQuality === "wav" || audioQuality === "flac" ? "- Lossless" : "- Studio Grade"}
-              </p>
-            </div>
-
-            {/* Quality & Tools */}
-            <div className="mt-2 border-t border-border pt-4">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Quality & Tools
-              </p>
-
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Audio Quality
-                </label>
-                <Select value={audioQuality} onValueChange={setAudioQuality}>
-                  <SelectTrigger className="w-full bg-secondary text-secondary-foreground text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {audioQualities.map((q) => (
-                      <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <LeftSlider label="Compression" value={compression} onChange={setCompression} suffix="%" />
-              <LeftSlider label="Reverb" value={reverb} onChange={setReverb} suffix="%" />
-              <LeftSlider label="Delay" value={delay} onChange={setDelay} suffix="%" />
-
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="mt-3 flex w-full items-center justify-between rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Advanced Tools
-                {showAdvanced ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-              </button>
-
-              {showAdvanced && (
-                <div className="mt-3 flex flex-col gap-3 rounded-lg border border-border bg-secondary/30 p-3">
-                  <LeftSlider label="Master Gain" value={masterGain} onChange={setMasterGain} min={-12} max={12} suffix=" dB" />
-                  <LeftSlider label="Stereo Width" value={stereoWidth} onChange={setStereoWidth} suffix="%" />
-                  <LeftSlider label="Bass" value={bass} onChange={setBass} suffix="%" />
-                  <LeftSlider label="Treble" value={treble} onChange={setTreble} suffix="%" />
-                </div>
-              )}
-            </div>
-          </div>
-        </ScrollArea>
+    <div className="min-h-screen bg-[#020202] text-white p-8 font-sans selection:bg-indigo-500/40 overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse delay-700" />
       </div>
 
-      {/* ─── Main Panel ─── */}
-      <ScrollArea className="flex-1">
-        <div className="p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Music Generation Studio</h2>
-            <p className="text-sm text-muted-foreground">
-              Create professional tracks with AI-powered production tools &middot; Powered by Tone.js
-            </p>
-          </div>
-
-          {/* Prompt */}
-          <div className="mb-6">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Describe Your Music
-            </label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="A dreamy lo-fi beat with soft piano, vinyl crackle, and a chill jazz saxophone solo in the background..."
-              className="w-full resize-none rounded-lg border border-border bg-secondary p-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              rows={3}
-            />
-          </div>
-
-          {/* Genre Selector */}
-          <div className="mb-6">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Genre {selectedGenre && <span className="text-primary">({genreBPM[selectedGenre]} BPM)</span>}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {genres.map((genre) => (
-                <Badge
-                  key={genre}
-                  variant={selectedGenre === genre ? "default" : "outline"}
-                  className={`cursor-pointer transition-colors ${
-                    selectedGenre === genre
-                      ? "bg-primary text-primary-foreground"
-                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                  }`}
-                  onClick={() => setSelectedGenre(selectedGenre === genre ? null : genre)}
-                >
-                  {genre}
-                </Badge>
-              ))}
+      <div className="max-w-7xl mx-auto space-y-10 relative z-10">
+        {/* Header Section */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/[0.03] backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/5 shadow-2xl">
+          <div className="flex items-center gap-5">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/20 ring-1 ring-white/20">
+              <Sparkles className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black tracking-tighter">VOCAL GEN MASTER</h1>
+              <p className="text-white/30 text-xs font-bold uppercase tracking-[0.3em]">AI Singing & Song Production</p>
             </div>
           </div>
-
-          {/* Studio Mood Grid */}
-          <div className="mb-6">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Studio Mood Grid
-            </p>
-            <div className="grid grid-cols-4 gap-2 lg:grid-cols-5">
-              {moodGrid.map((item) => (
-                <button
-                  key={item.mood}
-                  onClick={() => toggleMood(item.mood)}
-                  className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
-                    selectedMoods.includes(item.mood)
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-card hover:border-primary/30"
-                  }`}
-                >
-                  <span className={`text-xs font-semibold ${
-                    selectedMoods.includes(item.mood) ? "text-primary" : "text-foreground"
-                  }`}>
-                    {item.mood}
-                  </span>
-                  <span className="mt-0.5 text-[10px] text-muted-foreground">{item.tag}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div className="mb-6">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Duration
-              </p>
-              <span className="text-xs font-semibold text-foreground">{duration[0]}s</span>
-            </div>
-            <Slider value={duration} onValueChange={setDuration} min={10} max={120} step={5} />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-              <span>10s</span>
-              <span>120s</span>
-            </div>
-          </div>
-
-          {/* Generate / Preview Controls */}
-          <div className="flex gap-3">
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-              size="lg"
-            >
-              {isGenerating ? (
-                <>
-                  <div className="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4" />
-                  Generate Track
-                </>
-              )}
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" className="text-white/40 hover:text-white rounded-xl px-5">
+              <RotateCcw className="h-4 w-4 mr-2" /> Reset
             </Button>
-
-            {hasGenerated && (
-              <>
-                <Button
-                  onClick={handlePreviewToggle}
-                  variant="outline"
-                  size="lg"
-                  className="gap-2"
-                >
-                  {tone.isPlaying ? (
-                    <>
-                      <Pause className="size-4" />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="size-4" />
-                      Preview
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleStop}
-                  variant="outline"
-                  size="lg"
-                  className="gap-2"
-                >
-                  <Square className="size-4" />
-                  Stop
-                </Button>
-              </>
-            )}
+            <Button className="bg-white text-black hover:bg-white/90 rounded-2xl px-8 font-bold h-12 shadow-xl">
+              Launch Studio Pro
+            </Button>
           </div>
+        </header>
 
-          {/* Preview Waveform when playing */}
-          {hasGenerated && (
-            <div className="mt-6 rounded-xl border border-border bg-card p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Generated Preview
-                </p>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-muted-foreground">
-                    {selectedGenre || "Default"} &middot; {selectedGenre ? genreBPM[selectedGenre] : 120} BPM
-                  </span>
-                  <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">
-                    Tone.js
-                  </Badge>
+        {/* Workspace Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Creative Input Panel */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Song description */}
+            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-10 space-y-8 shadow-2xl overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] -mr-32 -mt-32 rounded-full group-hover:bg-indigo-500/10 transition-colors duration-700" />
+              
+              <div className="space-y-6 relative z-10">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold flex items-center gap-3">
+                    <Music className="h-6 w-6 text-indigo-400" /> Song Architect
+                  </h2>
+                  <div className="flex gap-2">
+                    {["808", "Vintage", "Clear"].map(m => (
+                      <Badge key={m} variant="outline" className="border-white/10 text-white/40 text-[10px] uppercase px-2">{m}</Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="relative">
+                  <Input 
+                    placeholder="Describe your song (e.g. 'Epic cinematic phonk with heavy bass...')"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    className="h-20 bg-black/40 border-white/10 rounded-3xl px-8 text-xl placeholder:text-white/10 focus:ring-2 ring-indigo-500/20 transition-all shadow-inner"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="text-white/20 hover:text-white"><Zap className="h-5 w-5" /></Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {["Phonk", "Cyberpunk", "Dark Trap", "Lofi", "Techno"].map(genre => (
+                    <button 
+                      key={genre}
+                      onClick={() => setSelectedGenre(genre)}
+                      className={cn(
+                        "px-6 py-2.5 rounded-full text-sm font-bold border transition-all duration-300",
+                        selectedGenre === genre 
+                          ? "bg-white text-black border-white shadow-lg scale-105" 
+                          : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      {genre}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <SpectrumVisualizer
-                data={spectrum.spectrumData}
-                isPlaying={tone.isPlaying}
-                barCount={48}
-                height={56}
-              />
-              {/* Scrubber */}
-              <div className="mt-3 flex items-center gap-3">
-                <span className="w-10 text-right text-[10px] font-mono text-muted-foreground">
-                  {formatTime(tone.progress)}
-                </span>
-                <Slider
-                  value={[tone.progress]}
-                  onValueChange={([v]) => tone.setProgress(v)}
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  className="flex-1"
-                />
-                <span className="w-10 text-[10px] font-mono text-muted-foreground">
-                  {duration[0]}s
-                </span>
+            </Card>
+
+            {/* AI Lyric & Vocal Engine */}
+            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-10 space-y-8 shadow-2xl relative">
+              <div className="flex items-center justify-between relative z-10">
+                <h2 className="text-2xl font-bold flex items-center gap-3">
+                  <Mic2 className="h-6 w-6 text-pink-500" /> AI Vocal Suite
+                </h2>
+                <div className="flex items-center gap-4">
+                   <select 
+                    value={selectedVoice} 
+                    onChange={(e) => setSelectedVoice(e.target.value)}
+                    className="bg-black/40 border border-white/10 text-white/80 rounded-xl px-4 py-2 text-sm outline-none"
+                   >
+                     <option value="female">Studio Female</option>
+                     <option value="male">Rich Baritone</option>
+                     <option value="child">Echo Child</option>
+                   </select>
+                   <Badge className="bg-pink-500/10 text-pink-400 border-none font-bold">HQ ENGINE</Badge>
+                </div>
               </div>
-            </div>
-          )}
+
+              <div className="relative group z-10">
+                <textarea 
+                  value={lyrics}
+                  onChange={(e) => setLyrics(e.target.value)}
+                  className="w-full h-64 bg-black/40 border border-white/10 rounded-[2rem] p-8 text-lg text-white/60 font-mono leading-relaxed focus:outline-none focus:border-pink-500/50 transition-all shadow-inner resize-none"
+                  placeholder="Paste your lyrics here or let AI generate them..."
+                />
+                <Button className="absolute bottom-6 right-6 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/10 px-6 h-10 backdrop-blur-xl">
+                  <Wand2 className="h-4 w-4 mr-2" /> AI Write
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 relative z-10">
+                <div className="flex items-center gap-8">
+                  <button 
+                    onClick={() => {
+                      setIsPlaying(!isPlaying)
+                      if (!isPlaying) play(selectedGenre, 128)
+                      else stop()
+                    }}
+                    className={cn(
+                      "h-20 w-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ring-4 ring-white/5",
+                      isPlaying 
+                        ? "bg-pink-500 text-white scale-110 shadow-pink-500/40 rotate-90" 
+                        : "bg-white text-black hover:scale-105 active:scale-95"
+                    )}
+                  >
+                    {isPlaying ? <Pause className="h-10 w-10" /> : <Play className="h-10 w-10 ml-1.5" />}
+                  </button>
+                  <div>
+                    <p className="text-xl font-bold tracking-tight">Audio Synthesis Active</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-xs font-bold text-white/30 flex items-center gap-1">
+                        <Waves className="h-3 w-3" /> Real-time Vocals
+                      </span>
+                      <span className="text-xs font-bold text-white/30 flex items-center gap-1">
+                        <Headphones className="h-3 w-3" /> Studio Monitoring
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Master Volume</span>
+                  <div className="flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
+                    <Volume2 className="h-5 w-5 text-white/40" />
+                    <Slider defaultValue={[75]} max={100} className="w-32" />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Visualization & Actions Panel */}
+          <div className="lg:col-span-4 space-y-8">
+            {/* Generation Progress */}
+            <AnimatePresence>
+              {isGenerating && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
+                  <Card className="bg-indigo-600 border-none rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-500/30 overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+                    <div className="relative z-10 space-y-6">
+                      <div className="flex justify-between items-end">
+                        <h3 className="text-3xl font-black italic">GENESIS</h3>
+                        <span className="text-4xl font-black opacity-40">{progress}%</span>
+                      </div>
+                      <div className="h-3 w-full bg-black/20 rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-white shadow-[0_0_20px_white]"
+                          initial={{ width: 0 }}
+                          animate={{ width: \`\${progress}%\` }}
+                        />
+                      </div>
+                      <p className="text-xs font-bold uppercase tracking-widest opacity-60">Synthesizing vocal patterns and arrangement...</p>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Mastering Controls */}
+            <Card className="bg-white/[0.03] border-white/5 rounded-[3rem] p-8 space-y-8 shadow-2xl">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Palette className="h-5 w-5 text-indigo-400" /> Mastering Rack
+              </h3>
+              
+              <div className="space-y-6">
+                {[
+                  { label: "Vocal Clarity", val: 85, color: "bg-pink-500" },
+                  { label: "Bass Warmth", val: 92, color: "bg-indigo-500" },
+                  { label: "Reverb Tail", val: 40, color: "bg-purple-500" },
+                  { label: "Presence", val: 65, color: "bg-yellow-500" }
+                ].map((item, i) => (
+                  <div key={i} className="space-y-3">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-white/40">
+                      <span>{item.label}</span>
+                      <span className="text-white/80">{item.val}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full">
+                      <div className={cn("h-full rounded-full shadow-[0_0_10px_currentColor]", item.color)} style={{ width: \`\${item.val}%\`, color: \`var(--\${item.color.split('-')[1]}-500)\` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
+                  <p className="text-[10px] font-bold text-white/20 uppercase mb-1">BPM</p>
+                  <p className="text-2xl font-black">128.0</p>
+                </div>
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
+                  <p className="text-[10px] font-bold text-white/20 uppercase mb-1">Key</p>
+                  <p className="text-2xl font-black">Cm</p>
+                </div>
+              </div>
+            </Card>
+
+            <Button 
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt}
+              className="w-full h-24 rounded-[2.5rem] bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-2xl shadow-2xl shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+            >
+              {isGenerating ? "CREATING..." : "GENERATE SONG"}
+              <Sparkles className="ml-3 h-8 w-8 group-hover:rotate-12 transition-transform" />
+            </Button>
+            
+            <p className="text-center text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">
+              Powered by Dieter AI Audio v4.0 (2026)
+            </p>
+          </div>
         </div>
-      </ScrollArea>
-    </div>
-  )
-}
-
-/* ─── Reusable left-panel slider ─── */
-function LeftSlider({
-  label,
-  value,
-  onChange,
-  min = 0,
-  max = 100,
-  suffix = "",
-}: {
-  label: string
-  value: number[]
-  onChange: (v: number[]) => void
-  min?: number
-  max?: number
-  suffix?: string
-}) {
-  return (
-    <div className="mb-3">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold text-foreground">
-          {value[0] > 0 && min < 0 ? `+${value[0]}` : value[0]}{suffix}
-        </span>
       </div>
-      <Slider value={value} onValueChange={onChange} min={min} max={max} step={1} />
+
+      {/* Secret Singing Engine */}
+      <SingingEngine 
+        lyrics={lyrics} 
+        isPlaying={isPlaying} 
+        voiceType={selectedVoice} 
+        bpm={128} 
+      />
+
+      <PlaybackModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        songTitle={prompt || "Cybernetic Skyline"} 
+        lyrics={lyrics} 
+      />
     </div>
   )
-}
-
-function formatTime(progressPct: number) {
-  const totalSec = 30 // loop duration
-  const currentSec = Math.round((progressPct / 100) * totalSec)
-  const m = Math.floor(currentSec / 60)
-  const s = currentSec % 60
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
